@@ -1,7 +1,8 @@
 
 use core::fmt::Write;
 
-use uefi::{boot, proto::console::text::{Color, Key, Output, ScanCode}, Status};
+use alloc::string::ToString;
+use uefi::{boot, proto::console::text::{Color, Key, Output, ScanCode}, CStr16, Status};
 
 use crate::variable::VariableInfo;
 
@@ -28,6 +29,7 @@ impl <'a>  EditorInfo<'a> {
 
     pub fn write_all_area(&mut self) {
         self.write_address_area();
+        self.write_ascii_area();
         self.write_bin_area();
     }
 
@@ -67,6 +69,22 @@ impl <'a>  EditorInfo<'a> {
         let _ = self.output_protocol.enable_cursor(true);
         let _ = self.output_protocol.set_cursor_position(bin_pos[0] + (self.offset%16 )*3 + self.is_low_bit, bin_pos[1] + self.offset/16);
 
+    }
+
+    pub fn write_ascii_area(&mut self) {
+        let ascii_pos:[usize;2] = [self.def_pos[0] + 9 + 48, self.def_pos[1] + 1];
+        let _ = self.output_protocol.set_cursor_position(ascii_pos[0], ascii_pos[1]);
+        for (i, b) in self.var_info.data.iter().enumerate() {
+            match CStr16::from_u16_with_nul(&[*b as u16,0]) {
+                Ok(c) => {let _ = write!(self.output_protocol, "{}", c);},
+                Err(_err) => {let _ = write!(self.output_protocol, ".");},
+            }
+
+            if (i + 1) % 16 == 0 {
+                let _ = self.output_protocol.set_cursor_position(ascii_pos[0], ascii_pos[1] + ((i + 1) / 16));
+            }
+
+        }
     }
 
     pub fn input_handle(&mut self, key:Key) -> Status{
