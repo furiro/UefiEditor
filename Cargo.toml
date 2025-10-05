@@ -1,6 +1,7 @@
 [package]
-name = "UefiEdito"
+name = "UefiEditor"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+uefi = { version = "0.35", default-features = false, features = ["global_allocator", "logger", "panic_handler"] }
