@@ -15,7 +15,7 @@ extern crate alloc;
 
 mod variable;
 mod editor_info;
-
+mod area_info;
 
 
 fn make_test_variable() -> Status {
@@ -29,7 +29,7 @@ fn make_test_variable() -> Status {
         0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
     ]);
     let vendor: VariableVendor = VariableVendor(vendor_guid);
-    let data: &[u8] = b"This is test variable to check.";
+    let data: &[u8] = b"01234567890123456789012345678901234567890123456789";
     let attrs: VariableAttributes =   VariableAttributes::BOOTSERVICE_ACCESS
                                     | VariableAttributes::RUNTIME_ACCESS;
 
@@ -107,13 +107,7 @@ fn efi_main() -> Status {
 
     let mut ev: Event;
 
-    let mut ef = editor_info::EditorInfo{
-        offset          : 0,
-        output_protocol : output_protocol,
-        var_info        : var_info,
-        is_low_bit      : 0,
-        def_pos         : [0,5]
-    };
+    let mut ef = editor_info::EditorInfo::new(output_protocol, var_info);
 
     let _ = ef.output_protocol.set_color(Color::Yellow, Color::Black);
     let _ = ef.output_protocol.clear();
@@ -122,6 +116,13 @@ fn efi_main() -> Status {
 
     loop {
         ef.write_bin_area();
+        ef.write_address_area();
+        ef.write_ascii_area();
+
+        // update cursor pos
+        let current_cursor = ef.bin_area.cursor_pos();  // ef.active_area.cursor_pos()
+        let _ = ef.output_protocol.set_cursor_position(current_cursor[0], current_cursor[1]);
+        let _ = ef.output_protocol.enable_cursor(true);
 
         unsafe {
             ev = input_protocol.wait_for_key_event().unwrap().unsafe_clone();

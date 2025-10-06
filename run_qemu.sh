@@ -4,9 +4,13 @@ set -euo pipefail
 APP="target/x86_64-unknown-uefi/release/UefiEditor.efi"
 OVMF="/usr/share/OVMF/OVMF_CODE_4M.fd"
 
+SCRIPT="startup.nsh"
+
 test -f "$APP"        # ensure built
 rm -rf esp && mkdir -p esp/EFI/BOOT
 cp "$APP" esp/EFI/BOOT/BOOTX64.EFI
+cp "$SCRIPT" esp/EFI/BOOT/startup.nsh
+
 
 qemu-system-x86_64 \
   -drive if=pflash,format=raw,unit=0,readonly=on,file=./OVMF_CODE_4M.fd \
