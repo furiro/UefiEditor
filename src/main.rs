@@ -115,9 +115,9 @@ fn efi_main() -> Status {
     ef.write_all_area();
 
     loop {
-        ef.write_bin_area();
-        ef.write_address_area();
-        ef.write_ascii_area();
+        if ef.need_rewrite {
+            ef.write_all_area();
+        }
 
         // update cursor pos
         let current_cursor = ef.bin_area.cursor_pos();  // ef.active_area.cursor_pos()
