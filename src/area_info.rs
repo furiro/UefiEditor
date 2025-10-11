@@ -1,6 +1,7 @@
 
 use core::fmt::Write;
 
+use alloc::string::ToString;
 use uefi::{boot::{self}, proto::console::text::{Color, Key, Output, ScanCode}, CStr16};
 use crate::{editor_info::{char16_to_hex, EditorInfo}, uefi_editor::Cmd};
 
@@ -124,7 +125,37 @@ impl DraArea for BinArea {
             let _ = write!(&mut output_protocol, "{:08X} ", (hight + 0)*0x10);
         }
 
-        let _ = output_protocol.enable_cursor(true);
+        self.have_update = false;
     } 
 }
 
+
+pub struct VariableArea {
+    pub area_info       : AreaInfo,
+    pub have_update     : bool
+}
+
+impl VariableArea {
+    pub fn new(area_info:AreaInfo) -> VariableArea{
+
+        Self {
+            area_info,
+            have_update : true,
+        }
+    }
+}
+
+impl DraArea for VariableArea {
+    fn input_handle(&self, _:Key) -> (Cmd, i32) {
+        return (Cmd::NoOp, 0);
+    }
+    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:&mut EditorInfo) {
+        let _ = output_protocol.set_color(Color::White, Color::Black);
+        let _ = output_protocol.set_cursor_position(self.area_info.pos[0], self.area_info.pos[1]);
+        let _ = writeln!(output_protocol, "Name : {}", editor_info.var_info.name);
+        let _ = writeln!(output_protocol, "Guid : {}", editor_info.var_info.guid.to_string());
+        let _ = writeln!(output_protocol, "Size : {}", editor_info.var_info.size);
+
+        self.have_update = false;
+    }
+}

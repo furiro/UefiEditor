@@ -86,8 +86,8 @@ fn efi_main() -> Status {
         var_name = CStr16::from_u16_with_nul_unchecked(&var_name_utf16);
     }
 
-    let vendor_guid = match Guid::try_parse(&args[2]) {
-        Ok(g) => VariableVendor(g),
+    let guid = match Guid::try_parse(&args[2]) {
+        Ok(g) => g,
         Err(_e) => return Status::INVALID_PARAMETER,
     };
 
@@ -100,7 +100,7 @@ fn efi_main() -> Status {
 
     let mut var_info:variable::VariableInfo = variable::VariableInfo {
         name: var_name,
-        guid: vendor_guid,
+        guid: guid,
         attr: attrs,
         size: 0,
         data: Vec::new(),

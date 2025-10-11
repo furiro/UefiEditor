@@ -35,6 +35,9 @@ impl <'a>UefiEditor<'a> {
     }
 
     pub fn draw(&mut self) {
+        if self.area_manager.variable_area.have_update {
+            self.area_manager.variable_area.draw(&mut self.output_protocol, &mut self.editor_info);
+        }
         if self.area_manager.bin_area.have_update {
             self.area_manager.bin_area.draw(&mut self.output_protocol, &mut self.editor_info);
         }
