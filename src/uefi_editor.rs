@@ -8,7 +8,7 @@ use crate::editor_info::EditorInfo;
 use crate::area_manager::AreaManager;
 use crate::variable::VariableInfo;
 
-pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, NoOp}
+pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, Save, NoOp}
 
 pub struct UefiEditor<'a> {
     pub editor_info     : EditorInfo<'a>,
@@ -66,14 +66,11 @@ impl <'a>UefiEditor<'a> {
                 match u16::from(p) {
                     // ctrl + s
                     0x13 => {
-                        //cmd_save
-                        let _ = self.editor_info.var_info.save();
-                        return Status::ABORTED
+                        operation = (Cmd::Save, 0);
                     },
-                    _ => (),
+                    _ => operation = (Cmd::NoOp, 0),
                 }
                 // remove when save cmd
-                operation = (Cmd::NoOp, 0);
             }
 
             _ => operation = self.area_manager.bin_area.input_handle(key),
@@ -84,14 +81,23 @@ impl <'a>UefiEditor<'a> {
             Cmd::MoveTo     => self.cmd_move_to(operation.1),
             Cmd::WriteAt    => self.cmd_write_at(operation.1),
             Cmd::Goto       => (),
-            Cmd::NoOp       => (),
             Cmd::WriteAll   => (),
-            Cmd::Quit       => (),
+            Cmd::Quit       => self.cmd_quit(operation.1),
+            Cmd::Save       => self.cmd_save(operation.1),
+            Cmd::NoOp       => (),
+            _ => (),
         }
 
         return Status::SUCCESS
     }
 
+    fn cmd_save(&mut self, _:i32) {
+        let _ = self.editor_info.var_info.save();
+    }
+
+    fn cmd_quit (&mut self, _:i32) {
+        self.is_quit = true;
+    }
 
     fn cmd_move_to(&mut self, move_to:i32) {
         if move_to == 0 {
