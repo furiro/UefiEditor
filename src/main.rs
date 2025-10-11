@@ -5,18 +5,20 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use uefi::proto::loaded_image::LoadedImage;
 use uefi::{prelude::*, print, CStr16, Event};
-use uefi::proto::console::text::{Color, Input, Output};
+use uefi::proto::console::text::{Input, Output};
 use uefi::{Guid, cstr16};
 use uefi::boot::{self, get_handle_for_protocol};
 use uefi::runtime::{VariableVendor, VariableAttributes};
 
+use crate::uefi_editor::UefiEditor;
 
 extern crate alloc;
 
 mod variable;
 mod editor_info;
 mod area_info;
-
+mod area_manager;
+mod uefi_editor;
 
 fn make_test_variable() -> Status {
 
@@ -89,6 +91,9 @@ fn efi_main() -> Status {
         Err(_e) => return Status::INVALID_PARAMETER,
     };
 
+    //
+    // Variable init
+    //
     let attrs: VariableAttributes = VariableAttributes::empty();
 
     let _ = make_test_variable();
@@ -104,25 +109,17 @@ fn efi_main() -> Status {
     let _ = var_info.init();
 
 
-
+    //
+    // main process
+    //
     let mut ev: Event;
 
-    let mut ef = editor_info::EditorInfo::new(output_protocol, var_info);
-
-    let _ = ef.output_protocol.set_color(Color::Yellow, Color::Black);
-    let _ = ef.output_protocol.clear();
-
-    ef.write_all_area();
+    let mut uefi_editor = UefiEditor::new(var_info, output_protocol);
+    uefi_editor.init();
 
     loop {
-        if ef.need_rewrite {
-            ef.write_all_area();
-        }
-
-        // update cursor pos
-        let current_cursor = ef.bin_area.cursor_pos();  // ef.active_area.cursor_pos()
-        let _ = ef.output_protocol.set_cursor_position(current_cursor[0], current_cursor[1]);
-        let _ = ef.output_protocol.enable_cursor(true);
+        uefi_editor.draw();
+        uefi_editor.update_cursor();
 
         unsafe {
             ev = input_protocol.wait_for_key_event().unwrap().unsafe_clone();
@@ -130,12 +127,14 @@ fn efi_main() -> Status {
         let _ = uefi::boot::wait_for_event(&mut [ev]);
 
         if let Ok(Some(key)) = input_protocol.read_key() {
-            if ef.input_handle(key) == Status::ABORTED {
-                break;
-            }
+            let _ = uefi_editor.input_handle(key);
+        }
+
+        if uefi_editor.is_quit {
+            break;
         }
     }
-    let _ = ef.output_protocol.clear();
+    uefi_editor.clear();
 
     Status::SUCCESS
 }

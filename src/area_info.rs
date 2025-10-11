@@ -1,12 +1,14 @@
 
-use uefi::proto::console::text::{self, Key};
-use crate::editor_info::EditorInfo;
+use core::fmt::Write;
+
+use uefi::{boot::{self}, proto::console::text::{Color, Key, Output, ScanCode}, CStr16};
+use crate::{editor_info::{char16_to_hex, EditorInfo}, uefi_editor::Cmd};
 
 pub struct AreaInfo{
     pub(crate) pos      : [usize;2],
     pub hight           : usize,
     pub widht           : usize,
-    pub cursor_offset    : [usize;2],    //offset_from pos
+    pub cursor_offset   : [usize;2],    //offset_from pos
 }
 
 impl AreaInfo {
@@ -15,24 +17,122 @@ impl AreaInfo {
     }
 }
 
-enum cmd { write_all, write_at, move_to, goto, }
 
 pub trait DraArea {
-    fn InputKey(&self, key:Key) -> (cmd, usize);
-    fn Draw(&self, ei:EditorInfo);
+    fn input_handle(&self, key:Key) -> (Cmd, i32);
+//    fn Draw(&mut self, editor_info:&EditorInfo);
+    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:&mut EditorInfo);
 }
 
-struct BinArea{
-    
+pub struct BinArea{
+    pub area_info       : AreaInfo,
+    pub have_update     : bool
+}
+
+impl BinArea {
+    pub fn new(area_info:AreaInfo) -> BinArea{
+
+        Self {
+            area_info,
+            have_update : true,
+        }
+    }
 }
 
 impl DraArea for BinArea { 
-    fn InputKey(&self, key:Key) -> (cmd, usize) 
+    fn input_handle(&self, key:Key) -> (Cmd, i32) 
     {
-        return (cmd::write_all, 0);
+        let operation:(Cmd, i32);
+        match key {
+            uefi::proto::console::text::Key::Printable(p) => {
+                match char16_to_hex(u16::from(p)) {
+                    Some(x) => {
+                        // self.cmd_write_at(x);
+                        operation = (Cmd::WriteAt, x as i32);
+                    },
+                    None => operation = (Cmd::NoOp, 0),
+                }
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::ESCAPE => {
+                // return Status::ABORTED;
+                operation = (Cmd::Quit, 0);
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::UP => {
+                // self.cmd_move_to(-16);
+                operation = (Cmd::MoveTo, -16);
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::LEFT => {
+
+                // self.cmd_move_to(-1);
+                operation = (Cmd::MoveTo, -1);
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::RIGHT => {
+                // self.cmd_move_to(1);
+                operation = (Cmd::MoveTo, 1);
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::DOWN => {
+                // self.cmd_move_to(16);
+                operation = (Cmd::MoveTo, 16);
+            }
+            uefi::proto::console::text::Key::Special(_s) => {
+                operation = (Cmd::NoOp, 0);
+            }
+        }
+        return operation;
     }
-    fn Draw(&self, ei:EditorInfo){
-        
+
+    fn draw(&mut self, mut output_protocol: &mut boot::ScopedProtocol<Output>, editor_info:&mut EditorInfo){
+
+        let _ = output_protocol.enable_cursor(false);
+
+        let address_low_area_pos = [self.area_info.pos[0] + 9, self.area_info.pos[1]];
+        let bin_area_pos = [self.area_info.pos[0], self.area_info.pos[1] + 1];
+
+        // write upside of bin area
+        let _ = output_protocol.set_color(Color::White, Color::Black);
+        let _ = output_protocol.set_cursor_position(address_low_area_pos[0], address_low_area_pos[1]);
+        for i in 0..=0xf {
+            let _ = write!(&mut output_protocol, "{:02X} ", i);
+        }
+
+        for hight in 0..self.area_info.hight {
+            let _ = output_protocol.set_color(Color::Yellow, Color::Black);
+            // write bin & ascii
+            for i in 0..16 {
+                let write_at =  (editor_info.address_offset + hight)*16 + i;
+                // let write_at =  (0 + hight)*16 + i;
+                if write_at < editor_info.var_info.size {
+                    // bin
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + i*3, bin_area_pos[1] + hight);
+                    let _ = write!(output_protocol, "{:02X} ", editor_info.var_info.data[write_at]);
+                    // ascii
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + 48 + i*3, bin_area_pos[1] + hight);
+                    match CStr16::from_u16_with_nul(&[editor_info.var_info.data[write_at] as u16,0]) {
+                        Ok(c) => {let _ = write!(output_protocol, "{} ", c);},
+                        Err(_err) => {let _ = write!(output_protocol, ". ");},
+                    }
+                } else {
+                    // bin
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + i*3, bin_area_pos[1] + hight);
+                    let _ = write!(output_protocol, "   ");
+                    // ascii
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + 48 + i*3, bin_area_pos[1] + hight);
+                    let _ = write!(output_protocol, "  ");
+                }
+            }
+
+           if (editor_info.address_offset + hight) * 16 >= editor_info.var_info.size {
+            // if (0 + hight) * 16 >= var_info.size {
+                break;
+            }
+            // write left side of bin area
+            let _ = output_protocol.set_color(Color::White, Color::Black);
+            let _ = output_protocol.set_cursor_position(bin_area_pos[0], bin_area_pos[1] + hight);
+//            let _ = write!(&mut output_protocol, "{:08X} ", (hight + editor_info.address_offset)*0x10);
+            let _ = write!(&mut output_protocol, "{:08X} ", (hight + 0)*0x10);
+        }
+
+        let _ = output_protocol.enable_cursor(true);
     } 
 }
 
