@@ -1,6 +1,9 @@
 use uefi::proto::console::text::Key;
 
-use crate::area_info::{self, AreaInfo, BinArea, ConsoleArea, DrawArea, VariableArea};
+use crate::area_info::area_info::{self, AreaInfo, DrawArea};
+use crate::area_info::bin_area::BinArea;
+use crate::area_info::console_area::ConsoleArea;
+use crate::area_info::variable_info_area::VariableArea;
 use crate::constants::*;
 use crate::uefi_editor::{ Cmd};
 
@@ -27,11 +30,11 @@ impl AreaManager {
     pub fn new() -> AreaManager {
 
         let var_pos: [usize; 2] = [0,0];
-        let variable_area = area_info::VariableArea::new(AreaInfo{ pos : var_pos , hight: 5, widht: 48, cursor_offset: [0, 0] });
+        let variable_area = VariableArea::new(AreaInfo{ pos : var_pos , hight: 5, widht: 48, cursor_offset: [0, 0] });
 
         let bin_area_hight = 5;    // get from gop.mode
         let bin_pos: [usize; 2] = [var_pos[0], var_pos[1] + variable_area.area_info.hight];
-        let bin_area: BinArea = area_info::BinArea::new(AreaInfo{ pos : bin_pos , hight: bin_area_hight, widht: 48, cursor_offset: [BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y] });
+        let bin_area: BinArea = BinArea::new(AreaInfo{ pos : bin_pos , hight: bin_area_hight, widht: 48, cursor_offset: [BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y] });
 
         let console_hight = 4;
         let console_pos :[usize;2] = [bin_pos[0], bin_pos[1] + bin_area.area_info.hight];
@@ -45,6 +48,13 @@ impl AreaManager {
         }
     }
 
+    pub fn cursor_pos (&self) -> [usize;2] {
+        match self.active_window {
+            ActiveWindow::ActiveBinArea     => self.bin_area.area_info.cursor_pos(),
+            ActiveWindow::ActiveConsoleArea => self.console_area.area_info.cursor_pos(),
+        }
+    }
+
     pub fn input_handle (&mut self, key:Key) -> (Cmd, i32) {
         let operation:(Cmd, i32);
         match key {
@@ -54,10 +64,7 @@ impl AreaManager {
                     // ctrl + s
                     0x13 => operation = (Cmd::Save, 0),
                     // tab
-                    0x09 => {
-                        self.active_window = self.active_window.next();
-                        operation = (Cmd::NoOp, 0);
-                    },
+                    0x09 => operation = (Cmd::NextWindow, 0),
                     _ => operation = (Cmd::NoOp, 0),
                 }
                 // remove when save cmd

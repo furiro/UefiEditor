@@ -3,12 +3,12 @@ use uefi::boot::{self};
 use uefi::proto::console::text::{Key, Output};
 use uefi::{Char16, Status};
 
-use crate::area_info::DrawArea;
+use crate::area_info::area_info::DrawArea;
 use crate::editor_info::EditorInfo;
-use crate::area_manager::AreaManager;
+use crate::area_manager::{ActiveWindow, AreaManager};
 use crate::variable::VariableInfo;
 
-pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, Save, WriteInputBuffer, NoOp}
+pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, Save, WriteInputBuffer, NextWindow, NoOp}
 
 pub struct UefiEditor<'a> {
     pub editor_info     : EditorInfo<'a>,
@@ -76,11 +76,20 @@ impl <'a>UefiEditor<'a> {
             Cmd::Quit               => self.cmd_quit(operation.1),
             Cmd::Save               => self.cmd_save(operation.1),
             Cmd::WriteInputBuffer   => self.cmd_write_input_buffer(operation.1),
+            Cmd::NextWindow         => self.cmd_next_window(operation.1),
             Cmd::NoOp               => (),
             //_ => (),
         }
 
         return Status::SUCCESS
+    }
+
+    fn cmd_next_window (&mut self, _:i32) {
+        self.area_manager.active_window = self.area_manager.active_window.next();
+
+        let cursor = self.area_manager.cursor_pos();
+        let _ = self.output_protocol.set_cursor_position(cursor[0], cursor[1]);
+        let _ = self.output_protocol.enable_cursor(true);
     }
 
     fn cmd_write_input_buffer(&mut self, value:i32) {
