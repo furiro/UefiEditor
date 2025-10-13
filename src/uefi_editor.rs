@@ -51,8 +51,8 @@ impl <'a>UefiEditor<'a> {
     }
 
     pub fn update_cursor(&mut self) {
-        let current_cursor = self.area_manager.bin_area.area_info.cursor_pos();  // ef.active_area.cursor_pos()
-        let _ = self.output_protocol.set_cursor_position(current_cursor[0], current_cursor[1]);
+        let cursor = self.area_manager.cursor_pos();
+        let _ = self.output_protocol.set_cursor_position(cursor[0], cursor[1]);
         let _ = self.output_protocol.enable_cursor(true);
 
     }
@@ -86,10 +86,6 @@ impl <'a>UefiEditor<'a> {
 
     fn cmd_next_window (&mut self, _:i32) {
         self.area_manager.active_window = self.area_manager.active_window.next();
-
-        let cursor = self.area_manager.cursor_pos();
-        let _ = self.output_protocol.set_cursor_position(cursor[0], cursor[1]);
-        let _ = self.output_protocol.enable_cursor(true);
     }
 
     fn cmd_write_input_buffer(&mut self, value:i32) {
