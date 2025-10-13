@@ -19,6 +19,7 @@ mod editor_info;
 mod area_info;
 mod area_manager;
 mod uefi_editor;
+mod constants;
 
 fn make_test_variable() -> Status {
 

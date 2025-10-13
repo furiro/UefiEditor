@@ -3,7 +3,7 @@ use core::fmt::Write;
 
 use alloc::string::ToString;
 use uefi::{boot::{self}, proto::console::text::{Color, Key, Output, ScanCode}, CStr16};
-use crate::{editor_info::{char16_to_hex, EditorInfo}, uefi_editor::Cmd};
+use crate::{constants::{BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y}, editor_info::{char16_to_hex, EditorInfo}, uefi_editor::Cmd};
 
 pub struct AreaInfo{
     pub(crate) pos      : [usize;2],
@@ -19,10 +19,16 @@ impl AreaInfo {
 }
 
 
-pub trait DraArea {
+pub trait DrawArea {
     fn input_handle(&self, key:Key) -> (Cmd, i32);
-    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:&mut EditorInfo);
+    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:& EditorInfo);
 }
+
+
+
+//
+// BinArea
+//
 
 pub struct BinArea{
     pub area_info       : AreaInfo,
@@ -37,9 +43,14 @@ impl BinArea {
             have_update : true,
         }
     }
+
+    pub fn update_cursor_offset(&mut self, editor_info:& EditorInfo) {
+        self.area_info.cursor_offset = [editor_info.offset%16*3 + editor_info.is_low_bit + BIN_AREA_CURSOR_DEFAULT_X,
+                                        editor_info.offset/16 - editor_info.start_address + BIN_AREA_CURSOR_DEFAULT_Y]
+    }
 }
 
-impl DraArea for BinArea { 
+impl DrawArea for BinArea { 
     fn input_handle(&self, key:Key) -> (Cmd, i32) 
     {
         let operation:(Cmd, i32);
@@ -74,7 +85,7 @@ impl DraArea for BinArea {
         return operation;
     }
 
-    fn draw(&mut self, mut output_protocol: &mut boot::ScopedProtocol<Output>, editor_info:&mut EditorInfo){
+    fn draw(&mut self, mut output_protocol: &mut boot::ScopedProtocol<Output>, editor_info:& EditorInfo){
 
         let _ = output_protocol.enable_cursor(false);
 
@@ -91,15 +102,15 @@ impl DraArea for BinArea {
         for hight in 0..self.area_info.hight {
             // write bin & ascii
             for i in 0..16 {
-                let write_at =  (editor_info.address_offset + hight)*16 + i;
+                let write_at =  (editor_info.start_address + hight)*16 + i;
                 if write_at < editor_info.var_info.size {
                     // bin
                     let _ = output_protocol.set_color(Color::Yellow, Color::Black);
-                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + i*3, bin_area_pos[1] + hight);
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + BIN_AREA_CURSOR_DEFAULT_X + i*3, bin_area_pos[1] + hight);
                     let _ = write!(output_protocol, "{:02X} ", editor_info.var_info.data[write_at]);
                     // ascii
                     let _ = output_protocol.set_color(Color::White, Color::Black);
-                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + 48 + 1 + i*2, bin_area_pos[1] + hight);
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + BIN_AREA_CURSOR_DEFAULT_X + 48 + 1 + i*2, bin_area_pos[1] + hight);
                     match CStr16::from_u16_with_nul(&[editor_info.var_info.data[write_at] as u16,0]) {
                         Ok(c) => {let _ = write!(output_protocol, "{} ", c);},
                         Err(_err) => {let _ = write!(output_protocol, ". ");},
@@ -107,16 +118,16 @@ impl DraArea for BinArea {
                 } else {
                     // bin
                     let _ = output_protocol.set_color(Color::Yellow, Color::Black);
-                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + i*3, bin_area_pos[1] + hight);
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + BIN_AREA_CURSOR_DEFAULT_X + i*3, bin_area_pos[1] + hight);
                     let _ = write!(output_protocol, "   ");
                     // ascii
                     let _ = output_protocol.set_color(Color::White, Color::Black);
-                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + 9 + 48 + 1 + i*2, bin_area_pos[1] + hight);
+                    let _ = output_protocol.set_cursor_position(bin_area_pos[0] + BIN_AREA_CURSOR_DEFAULT_X + 48 + 1 + i*2, bin_area_pos[1] + hight);
                     let _ = write!(output_protocol, "  ");
                 }
             }
 
-           if (editor_info.address_offset + hight) * 16 >= editor_info.var_info.size {
+           if (editor_info.start_address + hight) * 16 >= editor_info.var_info.size {
                 break;
             }
             // write left side of bin area
@@ -130,6 +141,9 @@ impl DraArea for BinArea {
 }
 
 
+//
+// VariableInfo
+//
 pub struct VariableArea {
     pub area_info       : AreaInfo,
     pub have_update     : bool
@@ -145,11 +159,11 @@ impl VariableArea {
     }
 }
 
-impl DraArea for VariableArea {
+impl DrawArea for VariableArea {
     fn input_handle(&self, _:Key) -> (Cmd, i32) {
         return (Cmd::NoOp, 0);
     }
-    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:&mut EditorInfo) {
+    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:& EditorInfo) {
         let _ = output_protocol.set_color(Color::White, Color::Black);
         let _ = output_protocol.set_cursor_position(self.area_info.pos[0], self.area_info.pos[1]);
         let _ = writeln!(output_protocol, "Name : {}", editor_info.var_info.name);
@@ -159,3 +173,53 @@ impl DraArea for VariableArea {
         self.have_update = false;
     }
 }
+
+
+//
+// Console
+//
+
+pub struct ConsoleArea {
+    pub area_info       : AreaInfo,
+    pub have_update     : bool,
+}
+
+impl ConsoleArea {
+    pub fn new(area_info:AreaInfo) -> ConsoleArea{
+
+        Self {
+            area_info,
+            have_update : true,
+        }
+    }
+}
+
+impl DrawArea for ConsoleArea {
+    fn input_handle(&self, key:Key) -> (Cmd, i32) {
+        let operation:(Cmd, i32);
+        match key {
+            uefi::proto::console::text::Key::Printable(p) => {
+                let temp:u16 = p.into();
+                operation = (Cmd::WriteInputBuffer, temp as i32);
+            }
+            _ => operation = (Cmd::NoOp, 0),
+        }
+
+        return operation;
+    }
+    fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:& EditorInfo) {
+        let _ = output_protocol.set_color(Color::White, Color::Black);
+        let _ = output_protocol.set_cursor_position(self.area_info.pos[0], self.area_info.pos[1]);
+
+        let cstr = CStr16::from_char16_with_nul(&editor_info.input_buffer).ok();
+
+        // 出力
+        match cstr {
+            Some(s) => {let _ = writeln!(output_protocol, "{}", s);},
+            _ => (),
+        }
+        self.have_update = false;
+    }
+
+}
+

@@ -1,14 +1,14 @@
 
 use uefi::boot::{self};
 use uefi::proto::console::text::{Key, Output};
-use uefi::Status;
+use uefi::{Char16, Status};
 
-use crate::area_info::DraArea;
+use crate::area_info::DrawArea;
 use crate::editor_info::EditorInfo;
 use crate::area_manager::AreaManager;
 use crate::variable::VariableInfo;
 
-pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, Save, NoOp}
+pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, Save, WriteInputBuffer, NoOp}
 
 pub struct UefiEditor<'a> {
     pub editor_info     : EditorInfo<'a>,
@@ -30,16 +30,19 @@ impl <'a>UefiEditor<'a> {
             editor_info,
             area_manager,
             output_protocol,
-            is_quit : false,
+            is_quit         : false,
         }
     }
 
     pub fn draw(&mut self) {
         if self.area_manager.variable_area.have_update {
-            self.area_manager.variable_area.draw(&mut self.output_protocol, &mut self.editor_info);
+            self.area_manager.variable_area.draw(&mut self.output_protocol, & self.editor_info);
         }
         if self.area_manager.bin_area.have_update {
-            self.area_manager.bin_area.draw(&mut self.output_protocol, &mut self.editor_info);
+            self.area_manager.bin_area.draw(&mut self.output_protocol, & self.editor_info);
+        }
+        if self.area_manager.console_area.have_update {
+            self.area_manager.console_area.draw(&mut self.output_protocol,& self.editor_info);
         }
     }
 
@@ -63,35 +66,29 @@ impl <'a>UefiEditor<'a> {
     pub fn input_handle(&mut self, key:Key) -> Status{
         let operation:(Cmd, i32);
 
-        match key {
-            uefi::proto::console::text::Key::Printable(p) if u16::from(p) <= 0x1a => {
-                // ctrl pressed
-                match u16::from(p) {
-                    // ctrl + s
-                    0x13 => {
-                        operation = (Cmd::Save, 0);
-                    },
-                    _ => operation = (Cmd::NoOp, 0),
-                }
-                // remove when save cmd
-            }
-
-            _ => operation = self.area_manager.bin_area.input_handle(key),
-
-        }
+        operation = self.area_manager.input_handle(key);
 
         match operation.0 {
-            Cmd::MoveTo     => self.cmd_move_to(operation.1),
-            Cmd::WriteAt    => self.cmd_write_at(operation.1),
-            Cmd::Goto       => (),
-            Cmd::WriteAll   => (),
-            Cmd::Quit       => self.cmd_quit(operation.1),
-            Cmd::Save       => self.cmd_save(operation.1),
-            Cmd::NoOp       => (),
-            _ => (),
+            Cmd::MoveTo             => self.cmd_move_to(operation.1),
+            Cmd::WriteAt            => self.cmd_write_at(operation.1),
+            Cmd::Goto               => (),
+            Cmd::WriteAll           => (),
+            Cmd::Quit               => self.cmd_quit(operation.1),
+            Cmd::Save               => self.cmd_save(operation.1),
+            Cmd::WriteInputBuffer   => self.cmd_write_input_buffer(operation.1),
+            Cmd::NoOp               => (),
+            //_ => (),
         }
 
         return Status::SUCCESS
+    }
+
+    fn cmd_write_input_buffer(&mut self, value:i32) {
+        let char = unsafe { Char16::from_u16_unchecked(value as u16) };
+        let index = self.editor_info.input_buffer.len() - 1;
+        self.editor_info.input_buffer.insert(index, char);
+
+        self.area_manager.console_area.have_update = true;
     }
 
     fn cmd_save(&mut self, _:i32) {
@@ -113,8 +110,8 @@ impl <'a>UefiEditor<'a> {
                 self.editor_info.offset = 0;
             } else {
                 self.editor_info.offset -= movement;
-                if self.editor_info.offset < self.editor_info.address_offset * 16 {
-                    self.editor_info.address_offset -= 1;
+                if self.editor_info.offset < self.editor_info.start_address * 16 {
+                    self.editor_info.start_address -= 1;
                     self.area_manager.bin_area.have_update = true;
                 }
             }
@@ -123,14 +120,14 @@ impl <'a>UefiEditor<'a> {
                 self.editor_info.offset = self.editor_info.var_info.size -1;
             } else {
                 self.editor_info.offset += movement;
-                if self.editor_info.offset + movement > (self.editor_info.address_offset + self.area_manager.bin_area.area_info.hight) * 16 -1 {
-                    self.editor_info.address_offset += 1;
+                if self.editor_info.offset + movement > (self.editor_info.start_address + self.area_manager.bin_area.area_info.hight) * 16 -1 {
+                    self.editor_info.start_address += 1;
                     self.area_manager.bin_area.have_update = true;
                 }
             }
         }
 
-        self.area_manager.bin_area.area_info.cursor_offset = self.cursor_offset_from_offset();
+        self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
     }
 
     fn cmd_write_at(&mut self, value:i32) {
@@ -142,13 +139,10 @@ impl <'a>UefiEditor<'a> {
             self.editor_info.var_info.data[self.editor_info.offset] = (self.editor_info.var_info.data[self.editor_info.offset] & (0x0f as u8)) | (value<<4) as u8;
             self.editor_info.is_low_bit = 1;
         }
-        self.area_manager.bin_area.area_info.cursor_offset = self.cursor_offset_from_offset();
+        self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
         self.area_manager.bin_area.have_update = true;
     }
 
-    fn cursor_offset_from_offset(&mut self) -> [usize;2] {
-        [self.editor_info.offset%16*3 + self.editor_info.is_low_bit + 9, self.editor_info.offset/16 - self.editor_info.address_offset + 1]
-    }
 }
 
 

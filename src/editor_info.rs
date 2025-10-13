@@ -1,13 +1,17 @@
 
 
 
+use alloc::vec::Vec;
+use uefi::Char16;
+
 use crate::variable::VariableInfo;
 
 pub struct EditorInfo<'a>{
     pub offset              : usize,
     pub var_info            : VariableInfo<'a>,
+    pub input_buffer        : Vec<Char16>,
     pub is_low_bit          : usize,
-    pub address_offset      : usize,
+    pub start_address       : usize,
 }
 
 pub fn char16_to_hex(byte: u16) -> Option<u8> {
@@ -25,11 +29,15 @@ impl <'a>  EditorInfo<'a> {
 
     pub fn new(var_info : VariableInfo<'a>) -> EditorInfo<'a> {
 
+        let mut input_buffer: Vec<Char16> = Vec::new();
+        input_buffer.push(unsafe { Char16::from_u16_unchecked(0) });
+
         Self {
             offset              : 0,
             var_info            : var_info,
+            input_buffer        : input_buffer,
             is_low_bit          : 0,
-            address_offset      : 0,
+            start_address       : 0,
         }
     }
 
