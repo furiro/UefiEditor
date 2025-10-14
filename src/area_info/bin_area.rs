@@ -24,8 +24,8 @@ impl BinArea {
     }
 
     pub fn update_cursor_offset(&mut self, editor_info:& EditorInfo) {
-        self.area_info.cursor_offset = [editor_info.offset.current%16*3 + editor_info.is_low_bit + BIN_AREA_CURSOR_DEFAULT_X,
-                                        editor_info.offset.current/16 - editor_info.start_address + BIN_AREA_CURSOR_DEFAULT_Y]
+        self.area_info.cursor_offset = [editor_info.var_offset.current%16*3 + editor_info.is_low_bit + BIN_AREA_CURSOR_DEFAULT_X,
+                                        editor_info.var_offset.current/16 - editor_info.start_address + BIN_AREA_CURSOR_DEFAULT_Y]
     }
 }
 
@@ -37,7 +37,7 @@ impl DrawArea for BinArea {
             uefi::proto::console::text::Key::Printable(p) => {
                 match char16_to_hex(u16::from(p)) {
                     Some(x) => {
-                        operation = (Cmd::WriteAt, x as i32);
+                        operation = (Cmd::WriteVariable, x as i32);
                     },
                     None => operation = (Cmd::NoOp, 0),
                 }

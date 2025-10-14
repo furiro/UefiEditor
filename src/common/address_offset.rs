@@ -1,7 +1,7 @@
 
 pub struct AddressOffset{
-    min         : usize,
-    max         : usize,
+    pub min     : usize,
+    pub max     : usize,
     pub current : usize,
 }
 

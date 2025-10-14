@@ -4,7 +4,7 @@
 //
 use core::fmt::Write;
 
-use uefi::{boot, proto::console::text::{Color, Key, Output}, CStr16};
+use uefi::{boot, proto::console::text::{Color, Key, Output, ScanCode}, CStr16};
 
 use crate::{area_info::area_info::{AreaInfo, DrawArea}, editor_info::EditorInfo, uefi_editor::Cmd};
 
@@ -15,11 +15,14 @@ pub struct ConsoleArea {
 
 impl ConsoleArea {
     pub fn new(area_info:AreaInfo) -> ConsoleArea{
-
         Self {
             area_info,
             have_update : true,
         }
+    }
+
+    pub fn update_cursor_offset(&mut self, editor_info:&EditorInfo) {
+        self.area_info.cursor_offset = [editor_info.input_offset.current, 1];
     }
 }
 
@@ -30,6 +33,12 @@ impl DrawArea for ConsoleArea {
             uefi::proto::console::text::Key::Printable(p) => {
                 let temp:u16 = p.into();
                 operation = (Cmd::WriteInputBuffer, temp as i32);
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::LEFT => {
+                operation = (Cmd::MoveTo, -1);
+            }
+            uefi::proto::console::text::Key::Special(s) if s == ScanCode::RIGHT => {
+                operation = (Cmd::MoveTo, 1);
             }
             _ => operation = (Cmd::NoOp, 0),
         }

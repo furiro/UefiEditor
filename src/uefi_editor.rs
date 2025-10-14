@@ -8,7 +8,7 @@ use crate::editor_info::EditorInfo;
 use crate::area_manager::{ActiveWindow, AreaManager};
 use crate::variable::VariableInfo;
 
-pub enum Cmd { WriteAll, WriteAt, MoveTo, Goto, Quit, Save, WriteInputBuffer, NextWindow, NoOp}
+pub enum Cmd { WriteAll, WriteVariable, MoveTo, Goto, Quit, Save, WriteInputBuffer, NextWindow, NoOp}
 
 pub struct UefiEditor<'a> {
     pub editor_info     : EditorInfo<'a>,
@@ -70,7 +70,7 @@ impl <'a>UefiEditor<'a> {
 
         match operation.0 {
             Cmd::MoveTo             => self.cmd_move_to(operation.1),
-            Cmd::WriteAt            => self.cmd_write_at(operation.1),
+            Cmd::WriteVariable      => self.cmd_write_variable(operation.1),
             Cmd::Goto               => (),
             Cmd::WriteAll           => (),
             Cmd::Quit               => self.cmd_quit(operation.1),
@@ -90,9 +90,12 @@ impl <'a>UefiEditor<'a> {
 
     fn cmd_write_input_buffer(&mut self, value:i32) {
         let char = unsafe { Char16::from_u16_unchecked(value as u16) };
-        let index = self.editor_info.input_buffer.len() - 1;
-        self.editor_info.input_buffer.insert(index, char);
+        let index = self.editor_info.input_offset.current;
 
+        self.editor_info.input_buffer.insert(index, char);
+        self.editor_info.input_offset.max += self.editor_info.input_buffer.len() - 1;
+        self.editor_info.input_offset.increase(1);
+        self.area_manager.console_area.update_cursor_offset(&self.editor_info);
         self.area_manager.console_area.have_update = true;
     }
 
@@ -109,30 +112,43 @@ impl <'a>UefiEditor<'a> {
             return;
         }
         let movement = move_to.abs().try_into().unwrap();
-        if move_to < 0 {
-            self.editor_info.offset.decrease(movement);
-            if self.editor_info.offset.current < self.editor_info.start_address * 16 {
-                self.editor_info.start_address -= 1;
-                self.area_manager.bin_area.have_update = true;
-            }
-        } else {
-            self.editor_info.offset.increase(movement);
-            if self.editor_info.offset.current + movement > (self.editor_info.start_address + self.area_manager.bin_area.area_info.hight) * 16 -1 {
-                self.editor_info.start_address += 1;
-                self.area_manager.bin_area.have_update = true;
-            }
+        match self.area_manager.active_window {
+            ActiveWindow::ActiveBinArea => {
+                if move_to < 0 {
+                    self.editor_info.var_offset.decrease(movement);
+                    if self.editor_info.var_offset.current < self.editor_info.start_address * 16 {
+                        self.editor_info.start_address -= 1;
+                        self.area_manager.bin_area.have_update = true;
+                    }
+                } else {
+                    self.editor_info.var_offset.increase(movement);
+                    if self.editor_info.var_offset.current + movement > (self.editor_info.start_address + self.area_manager.bin_area.area_info.hight) * 16 -1 {
+                        self.editor_info.start_address += 1;
+                        self.area_manager.bin_area.have_update = true;
+                    }
+                }
+
+                self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
+            },
+            ActiveWindow::ActiveConsoleArea => {
+                if move_to < 0 {
+                    self.editor_info.input_offset.decrease(movement);
+                } else {
+                    self.editor_info.input_offset.increase(movement);
+                }
+                self.area_manager.console_area.update_cursor_offset(&self.editor_info);
+            },
         }
 
-        self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
     }
 
-    fn cmd_write_at(&mut self, value:i32) {
+    fn cmd_write_variable(&mut self, value:i32) {
         if self.editor_info.is_low_bit == 1 {
-            self.editor_info.var_info.data[self.editor_info.offset.current] = (self.editor_info.var_info.data[self.editor_info.offset.current] & (0xf0 as u8)) | value as u8;
+            self.editor_info.var_info.data[self.editor_info.var_offset.current] = (self.editor_info.var_info.data[self.editor_info.var_offset.current] & (0xf0 as u8)) | value as u8;
             self.editor_info.is_low_bit = 0;
-            self.editor_info.offset.increase(1);
+            self.editor_info.var_offset.increase(1);
         } else {
-            self.editor_info.var_info.data[self.editor_info.offset.current] = (self.editor_info.var_info.data[self.editor_info.offset.current] & (0x0f as u8)) | (value<<4) as u8;
+            self.editor_info.var_info.data[self.editor_info.var_offset.current] = (self.editor_info.var_info.data[self.editor_info.var_offset.current] & (0x0f as u8)) | (value<<4) as u8;
             self.editor_info.is_low_bit = 1;
         }
         self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
