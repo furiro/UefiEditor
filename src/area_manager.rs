@@ -29,16 +29,16 @@ pub struct AreaManager{
 impl AreaManager {
     pub fn new() -> AreaManager {
 
-        let var_pos: [usize; 2] = [0,0];
-        let variable_area = VariableArea::new(AreaInfo{ pos : var_pos , hight: 5, widht: 48, cursor_offset: [0, 0] });
+        let var_pos: [usize; 2]         = [0,0];
+        let variable_area: VariableArea = VariableArea::new(AreaInfo{ pos : var_pos , hight: 5, widht: 48, cursor_offset: [0, 0] });
 
-        let bin_area_hight = 5;    // get from gop.mode
-        let bin_pos: [usize; 2] = [var_pos[0], var_pos[1] + variable_area.area_info.hight];
-        let bin_area: BinArea = BinArea::new(AreaInfo{ pos : bin_pos , hight: bin_area_hight, widht: 48, cursor_offset: [BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y] });
+        let bin_area_hight: usize   = 5;    // get from gop.mode
+        let bin_pos: [usize; 2]     = [var_pos[0], var_pos[1] + variable_area.area_info.hight];
+        let bin_area: BinArea       = BinArea::new(AreaInfo{ pos : bin_pos , hight: bin_area_hight, widht: 48, cursor_offset: [BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y] });
 
-        let console_hight = 4;
-        let console_pos :[usize;2] = [bin_pos[0], bin_pos[1] + bin_area.area_info.hight];
-        let console_area : ConsoleArea = ConsoleArea::new(AreaInfo { pos: console_pos, hight: console_hight, widht: 48, cursor_offset: [0, 1] });
+        let console_hight: usize        = 4;
+        let console_pos :[usize;2]      = [bin_pos[0], bin_pos[1] + bin_area.area_info.hight];
+        let console_area : ConsoleArea  = ConsoleArea::new(AreaInfo { pos: console_pos, hight: console_hight, widht: 48, cursor_offset: [0, 1] });
 
         Self {
             bin_area,
@@ -58,18 +58,11 @@ impl AreaManager {
     pub fn input_handle (&mut self, key:Key) -> (Cmd, i32) {
         let operation:(Cmd, i32);
         match key {
-            uefi::proto::console::text::Key::Printable(p) if u16::from(p) <= 0x1a => {
-                // ctrl pressed
-                match u16::from(p) {
-                    // ctrl + s
-                    0x13 => operation = (Cmd::Save, 0),
-                    // tab
-                    0x09 => operation = (Cmd::NextWindow, 0),
-                    _ => operation = (Cmd::NoOp, 0),
-                }
-                // remove when save cmd
-            }
-            
+            // tab
+            uefi::proto::console::text::Key::Printable(p) if u16::from(p) == 0x09 => operation = (Cmd::NextWindow, 0),
+            // ctrl + s
+            uefi::proto::console::text::Key::Printable(p) if u16::from(p) == 0x13 => operation = (Cmd::Save, 0),
+
             _ => match self.active_window {
                 ActiveWindow::ActiveBinArea     => operation = self.bin_area.input_handle(key),
                 ActiveWindow::ActiveConsoleArea => operation = self.console_area.input_handle(key),

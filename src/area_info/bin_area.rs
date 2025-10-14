@@ -34,6 +34,10 @@ impl DrawArea for BinArea {
     {
         let operation:(Cmd, i32);
         match key {
+            // Escape special key
+            uefi::proto::console::text::Key::Printable(p) if u16::from(p) <= 0x1a => {
+                operation = (Cmd::NoOp, 0);
+            }
             uefi::proto::console::text::Key::Printable(p) => {
                 match char16_to_hex(u16::from(p)) {
                     Some(x) => {

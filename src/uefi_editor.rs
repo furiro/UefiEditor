@@ -24,8 +24,6 @@ impl <'a>UefiEditor<'a> {
         let editor_info = EditorInfo::new(var_info);
         let area_manager = AreaManager::new();
 
-
-
         Self {
             editor_info,
             area_manager,
@@ -89,12 +87,20 @@ impl <'a>UefiEditor<'a> {
     }
 
     fn cmd_write_input_buffer(&mut self, value:i32) {
-        let char = unsafe { Char16::from_u16_unchecked(value as u16) };
-        let index = self.editor_info.input_offset.current;
-
-        self.editor_info.input_buffer.insert(index, char);
-        self.editor_info.input_offset.max += self.editor_info.input_buffer.len() - 1;
-        self.editor_info.input_offset.increase(1);
+        let index: usize = self.editor_info.input_offset.current;
+        match value {
+            0x08 => if self.editor_info.input_offset.current > 0 {
+                self.editor_info.input_buffer.remove(index - 1);
+                self.editor_info.input_offset.max = self.editor_info.input_buffer.len() - 1;
+                self.editor_info.input_offset.decrease(1);
+            },
+            _ => {
+                let char = unsafe { Char16::from_u16_unchecked(value as u16) };
+                self.editor_info.input_buffer.insert(index, char);
+                self.editor_info.input_offset.max = self.editor_info.input_buffer.len() - 1;
+                self.editor_info.input_offset.increase(1);
+            }
+        }
         self.area_manager.console_area.update_cursor_offset(&self.editor_info);
         self.area_manager.console_area.have_update = true;
     }

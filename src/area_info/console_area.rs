@@ -30,9 +30,16 @@ impl DrawArea for ConsoleArea {
     fn input_handle(&self, key:Key) -> (Cmd, i32) {
         let operation:(Cmd, i32);
         match key {
+            // BackSpace
+            uefi::proto::console::text::Key::Printable(p) if u16::from(p) == 0x08 => {
+                operation = (Cmd::WriteInputBuffer, u16::from(p) as i32);
+            }
+            // Escape special key
+            uefi::proto::console::text::Key::Printable(p) if u16::from(p) <= 0x1a => {
+                operation = (Cmd::NoOp, 0);
+            }
             uefi::proto::console::text::Key::Printable(p) => {
-                let temp:u16 = p.into();
-                operation = (Cmd::WriteInputBuffer, temp as i32);
+                operation = (Cmd::WriteInputBuffer, u16::from(p) as i32);
             }
             uefi::proto::console::text::Key::Special(s) if s == ScanCode::LEFT => {
                 operation = (Cmd::MoveTo, -1);
@@ -52,9 +59,13 @@ impl DrawArea for ConsoleArea {
         let cstr = CStr16::from_char16_with_nul(&editor_info.input_buffer).ok();
 
         let _ = writeln! (output_protocol, "Console Area");
-
         match cstr {
-            Some(s) => {let _ = writeln!(output_protocol, "{}", s);},
+            Some(s) => {
+                let _ = output_protocol.set_cursor_position(self.area_info.pos[0], self.area_info.pos[1] + 1);
+                let _ = writeln!(output_protocol, "{}", " ".repeat(self.area_info.widht));
+                let _ = output_protocol.set_cursor_position(self.area_info.pos[0], self.area_info.pos[1] + 1);
+                let _ = writeln!(output_protocol, "{}", s);
+            },
             _ => (),
         }
         self.have_update = false;
