@@ -1,12 +1,11 @@
 
 
 
-use core::ops::Add;
 
 use alloc::vec::Vec;
 use uefi::Char16;
 
-use crate::{common::address_offset::{self, AddressOffset}, variable::VariableInfo};
+use crate::{common::address_offset::AddressOffset, variable::VariableInfo};
 
 pub struct EditorInfo<'a>{
     pub var_offset          : AddressOffset,

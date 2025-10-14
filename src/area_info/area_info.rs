@@ -1,9 +1,7 @@
 
-use core::fmt::Write;
 
-use alloc::string::ToString;
-use uefi::{boot::{self}, proto::console::text::{Color, Key, Output, ScanCode}, CStr16};
-use crate::{constants::{BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y}, editor_info::{char16_to_hex, EditorInfo}, uefi_editor::Cmd};
+use uefi::{boot::{self}, proto::console::text::{Key, Output}};
+use crate::{editor_info::EditorInfo, uefi_editor::Cmd};
 
 pub struct AreaInfo{
     pub(crate) pos      : [usize;2],

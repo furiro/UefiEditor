@@ -1,6 +1,6 @@
 use uefi::proto::console::text::Key;
 
-use crate::area_info::area_info::{self, AreaInfo, DrawArea};
+use crate::area_info::area_info::{AreaInfo, DrawArea};
 use crate::area_info::bin_area::BinArea;
 use crate::area_info::console_area::ConsoleArea;
 use crate::area_info::variable_info_area::VariableArea;
