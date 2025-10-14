@@ -24,8 +24,8 @@ impl BinArea {
     }
 
     pub fn update_cursor_offset(&mut self, editor_info:& EditorInfo) {
-        self.area_info.cursor_offset = [editor_info.offset%16*3 + editor_info.is_low_bit + BIN_AREA_CURSOR_DEFAULT_X,
-                                        editor_info.offset/16 - editor_info.start_address + BIN_AREA_CURSOR_DEFAULT_Y]
+        self.area_info.cursor_offset = [editor_info.offset.current%16*3 + editor_info.is_low_bit + BIN_AREA_CURSOR_DEFAULT_X,
+                                        editor_info.offset.current/16 - editor_info.start_address + BIN_AREA_CURSOR_DEFAULT_Y]
     }
 }
 

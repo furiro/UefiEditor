@@ -4,10 +4,10 @@
 use alloc::vec::Vec;
 use uefi::Char16;
 
-use crate::variable::VariableInfo;
+use crate::{common::address_offset::{self, AddressOffset}, variable::VariableInfo};
 
 pub struct EditorInfo<'a>{
-    pub offset              : usize,
+    pub offset              : AddressOffset,
     pub var_info            : VariableInfo<'a>,
     pub input_buffer        : Vec<Char16>,
     pub is_low_bit          : usize,
@@ -33,7 +33,7 @@ impl <'a>  EditorInfo<'a> {
         input_buffer.push(unsafe { Char16::from_u16_unchecked(0) });
 
         Self {
-            offset              : 0,
+            offset              : AddressOffset::new(0, var_info.size, 0),
             var_info            : var_info,
             input_buffer        : input_buffer,
             is_low_bit          : 0,

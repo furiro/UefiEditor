@@ -110,25 +110,16 @@ impl <'a>UefiEditor<'a> {
         }
         let movement = move_to.abs().try_into().unwrap();
         if move_to < 0 {
-
-            if self.editor_info.offset < movement {
-                self.editor_info.offset = 0;
-            } else {
-                self.editor_info.offset -= movement;
-                if self.editor_info.offset < self.editor_info.start_address * 16 {
-                    self.editor_info.start_address -= 1;
-                    self.area_manager.bin_area.have_update = true;
-                }
+            self.editor_info.offset.decrease(movement);
+            if self.editor_info.offset.current < self.editor_info.start_address * 16 {
+                self.editor_info.start_address -= 1;
+                self.area_manager.bin_area.have_update = true;
             }
         } else {
-            if self.editor_info.offset + movement > self.editor_info.var_info.size - 1 {
-                self.editor_info.offset = self.editor_info.var_info.size -1;
-            } else {
-                self.editor_info.offset += movement;
-                if self.editor_info.offset + movement > (self.editor_info.start_address + self.area_manager.bin_area.area_info.hight) * 16 -1 {
-                    self.editor_info.start_address += 1;
-                    self.area_manager.bin_area.have_update = true;
-                }
+            self.editor_info.offset.increase(movement);
+            if self.editor_info.offset.current + movement > (self.editor_info.start_address + self.area_manager.bin_area.area_info.hight) * 16 -1 {
+                self.editor_info.start_address += 1;
+                self.area_manager.bin_area.have_update = true;
             }
         }
 
@@ -137,11 +128,11 @@ impl <'a>UefiEditor<'a> {
 
     fn cmd_write_at(&mut self, value:i32) {
         if self.editor_info.is_low_bit == 1 {
-            self.editor_info.var_info.data[self.editor_info.offset] = (self.editor_info.var_info.data[self.editor_info.offset] & (0xf0 as u8)) | value as u8;
+            self.editor_info.var_info.data[self.editor_info.offset.current] = (self.editor_info.var_info.data[self.editor_info.offset.current] & (0xf0 as u8)) | value as u8;
             self.editor_info.is_low_bit = 0;
-            self.editor_info.offset += 1;
+            self.editor_info.offset.increase(1);
         } else {
-            self.editor_info.var_info.data[self.editor_info.offset] = (self.editor_info.var_info.data[self.editor_info.offset] & (0x0f as u8)) | (value<<4) as u8;
+            self.editor_info.var_info.data[self.editor_info.offset.current] = (self.editor_info.var_info.data[self.editor_info.offset.current] & (0x0f as u8)) | (value<<4) as u8;
             self.editor_info.is_low_bit = 1;
         }
         self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
