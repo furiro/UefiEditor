@@ -5,9 +5,9 @@
 
 use core::fmt::Write;
 
-use uefi::{boot, proto::console::text::{Color, Key, Output, ScanCode}, CStr16};
+use uefi::{boot, proto::console::text::{Color, Output, ScanCode}, CStr16};
 
-use crate::{area_info::area_info::{AreaInfo, DrawArea}, constants::*, editor_info::{char16_to_hex, EditorInfo}, uefi_editor::Cmd};
+use crate::{area_info::area_info::{AreaInfo, DrawArea}, constants::*, editor_info::{char16_to_hex, EditorInfo}, input_ex::EfiKeyData, uefi_editor::Cmd};
 
 pub struct BinArea{
     pub area_info       : AreaInfo,
@@ -30,41 +30,28 @@ impl BinArea {
 }
 
 impl DrawArea for BinArea { 
-    fn input_handle(&self, key:Key) -> (Cmd, i32) 
+    fn input_handle(&self, key:EfiKeyData) -> (Cmd, i32) 
     {
         let operation:(Cmd, i32);
-        match key {
-            // Escape special key
-            uefi::proto::console::text::Key::Printable(p) if u16::from(p) <= 0x1a => {
-                operation = (Cmd::NoOp, 0);
-            }
-            uefi::proto::console::text::Key::Printable(p) => {
-                match char16_to_hex(u16::from(p)) {
-                    Some(x) => {
-                        operation = (Cmd::WriteVariable, x as i32);
-                    },
-                    None => operation = (Cmd::NoOp, 0),
-                }
-            }
-            uefi::proto::console::text::Key::Special(s) if s == ScanCode::ESCAPE => {
-                operation = (Cmd::Quit, 0);
-            }
-            uefi::proto::console::text::Key::Special(s) if s == ScanCode::UP => {
-                operation = (Cmd::MoveTo, -16);
-            }
-            uefi::proto::console::text::Key::Special(s) if s == ScanCode::LEFT => {
-                operation = (Cmd::MoveTo, -1);
-            }
-            uefi::proto::console::text::Key::Special(s) if s == ScanCode::RIGHT => {
-                operation = (Cmd::MoveTo, 1);
-            }
-            uefi::proto::console::text::Key::Special(s) if s == ScanCode::DOWN => {
-                operation = (Cmd::MoveTo, 16);
-            }
-            uefi::proto::console::text::Key::Special(_s) => {
-                operation = (Cmd::NoOp, 0);
-            }
+
+        // Input is hex
+        match char16_to_hex(u16::from(key.key.unicode_char)) {
+            Some(x) => {
+                return (Cmd::WriteVariable, x as i32);
+            },
+            None => (),
         }
+
+        match key.key.scan_code {
+            ScanCode::ESCAPE    => operation = (Cmd::Quit, 0),
+            ScanCode::UP        => operation = (Cmd::MoveTo, -16),
+            ScanCode::LEFT      => operation = (Cmd::MoveTo, -1),
+            ScanCode::RIGHT     => operation = (Cmd::MoveTo, 1),
+            ScanCode::DOWN      => operation = (Cmd::MoveTo, 16),
+            // others
+            _ => operation = (Cmd::NoOp, 0),
+        }
+
         return operation;
     }
 

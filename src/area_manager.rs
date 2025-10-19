@@ -1,10 +1,11 @@
-use uefi::proto::console::text::Key;
+use uefi::proto::console::text::ScanCode;
 
 use crate::area_info::area_info::{AreaInfo, DrawArea};
 use crate::area_info::bin_area::BinArea;
 use crate::area_info::console_area::ConsoleArea;
 use crate::area_info::variable_info_area::VariableArea;
 use crate::constants::*;
+use crate::input_ex::{EfiKeyData, KeyShiftState};
 use crate::uefi_editor::{ Cmd};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -37,7 +38,7 @@ impl AreaManager {
         let bin_area: BinArea       = BinArea::new(AreaInfo{ pos : bin_pos , hight: bin_area_hight, widht: 48, cursor_offset: [BIN_AREA_CURSOR_DEFAULT_X, BIN_AREA_CURSOR_DEFAULT_Y] });
 
         let console_hight: usize        = 4;
-        let console_pos :[usize;2]      = [bin_pos[0], bin_pos[1] + bin_area.area_info.hight];
+        let console_pos  : [usize;2]    = [bin_pos[0], bin_pos[1] + bin_area.area_info.hight];
         let console_area : ConsoleArea  = ConsoleArea::new(AreaInfo { pos: console_pos, hight: console_hight, widht: 48, cursor_offset: [0, 1] });
 
         Self {
@@ -55,21 +56,20 @@ impl AreaManager {
         }
     }
 
-    pub fn input_handle (&mut self, key:Key) -> (Cmd, i32) {
+    pub fn input_handle (&mut self, key:EfiKeyData) -> (Cmd, i32) {
         let operation:(Cmd, i32);
-        match key {
-            // tab
-            uefi::proto::console::text::Key::Printable(p) if u16::from(p) == 0x09 => operation = (Cmd::NextWindow, 0),
+        match key.key.scan_code {
+            // ins
+            ScanCode::INSERT => operation = (Cmd::NextWindow, 0),
             // ctrl + s
-            uefi::proto::console::text::Key::Printable(p) if u16::from(p) == 0x13 => operation = (Cmd::Save, 0),
-
+            _ if key.key_state.key_shift_state.intersects(KeyShiftState::LEFT_SHIFT | KeyShiftState::RIGHT_SHIFT) => operation = (Cmd::Save, 0),
+            // others
             _ => match self.active_window {
                 ActiveWindow::ActiveBinArea     => operation = self.bin_area.input_handle(key),
                 ActiveWindow::ActiveConsoleArea => operation = self.console_area.input_handle(key),
                 //_ => operation = (Cmd::NoOp, 0),
-            }
+            },
         }
-
         return operation;
     }
 

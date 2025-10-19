@@ -1,8 +1,8 @@
 use alloc::string::ToString;
-use uefi::{boot, proto::console::text::{Color, Key, Output}};
+use uefi::{boot, proto::console::text::{Color, Output}};
 use core::fmt::Write;
 
-use crate::{area_info::area_info::{AreaInfo, DrawArea}, editor_info::EditorInfo, uefi_editor::Cmd};
+use crate::{area_info::area_info::{AreaInfo, DrawArea}, editor_info::EditorInfo, input_ex::EfiKeyData, uefi_editor::Cmd};
 
 
 //
@@ -24,7 +24,7 @@ impl VariableArea {
 }
 
 impl DrawArea for VariableArea {
-    fn input_handle(&self, _:Key) -> (Cmd, i32) {
+    fn input_handle(&self, _:EfiKeyData) -> (Cmd, i32) {
         return (Cmd::NoOp, 0);
     }
     fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:& EditorInfo) {

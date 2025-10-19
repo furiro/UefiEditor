@@ -1,11 +1,12 @@
 
 use uefi::boot::{self};
-use uefi::proto::console::text::{Key, Output};
+use uefi::proto::console::text::Output;
 use uefi::{Char16, Status};
 
 use crate::area_info::area_info::DrawArea;
 use crate::editor_info::EditorInfo;
 use crate::area_manager::{ActiveWindow, AreaManager};
+use crate::input_ex::EfiKeyData;
 use crate::variable::VariableInfo;
 
 pub enum Cmd { WriteAll, WriteVariable, MoveTo, Goto, Quit, Save, WriteInputBuffer, NextWindow, NoOp}
@@ -61,7 +62,7 @@ impl <'a>UefiEditor<'a> {
         self.area_manager.bin_area.draw(&mut self.output_protocol, &mut self.editor_info);
     }
 
-    pub fn input_handle(&mut self, key:Key) -> Status{
+    pub fn input_handle(&mut self, key:EfiKeyData) -> Status{
         let operation:(Cmd, i32);
 
         operation = self.area_manager.input_handle(key);
@@ -87,18 +88,18 @@ impl <'a>UefiEditor<'a> {
     }
 
     fn cmd_write_input_buffer(&mut self, value:i32) {
-        let index: usize = self.editor_info.input_offset.current;
+        let index: usize = self.editor_info.input_info.offset.current;
         match value {
-            0x08 => if self.editor_info.input_offset.current > 0 {
-                self.editor_info.input_buffer.remove(index - 1);
-                self.editor_info.input_offset.max = self.editor_info.input_buffer.len() - 1;
-                self.editor_info.input_offset.decrease(1);
+            0x08 => if self.editor_info.input_info.offset.current > 0 {
+                self.editor_info.input_info.buffer.remove(index - 1);
+                self.editor_info.input_info.offset.max = self.editor_info.input_info.buffer.len() - 1;
+                self.editor_info.input_info.offset.decrease(1);
             },
             _ => {
                 let char = unsafe { Char16::from_u16_unchecked(value as u16) };
-                self.editor_info.input_buffer.insert(index, char);
-                self.editor_info.input_offset.max = self.editor_info.input_buffer.len() - 1;
-                self.editor_info.input_offset.increase(1);
+                self.editor_info.input_info.buffer.insert(index, char);
+                self.editor_info.input_info.offset.max = self.editor_info.input_info.buffer.len() - 1;
+                self.editor_info.input_info.offset.increase(1);
             }
         }
         self.area_manager.console_area.update_cursor_offset(&self.editor_info);
@@ -134,13 +135,14 @@ impl <'a>UefiEditor<'a> {
                     }
                 }
 
+                self.editor_info.is_low_bit = 0;
                 self.area_manager.bin_area.update_cursor_offset(&self.editor_info);
             },
             ActiveWindow::ActiveConsoleArea => {
                 if move_to < 0 {
-                    self.editor_info.input_offset.decrease(movement);
+                    self.editor_info.input_info.offset.decrease(movement);
                 } else {
-                    self.editor_info.input_offset.increase(movement);
+                    self.editor_info.input_info.offset.increase(movement);
                 }
                 self.area_manager.console_area.update_cursor_offset(&self.editor_info);
             },

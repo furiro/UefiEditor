@@ -1,7 +1,7 @@
 
 
-use uefi::{boot::{self}, proto::console::text::{Key, Output}};
-use crate::{editor_info::EditorInfo, uefi_editor::Cmd};
+use uefi::{boot::{self}, proto::console::text::Output};
+use crate::{editor_info::EditorInfo, input_ex::EfiKeyData, uefi_editor::Cmd};
 
 pub struct AreaInfo{
     pub(crate) pos      : [usize;2],
@@ -18,7 +18,7 @@ impl AreaInfo {
 
 
 pub trait DrawArea {
-    fn input_handle(&self, key:Key) -> (Cmd, i32);
+    fn input_handle(&self, key:EfiKeyData) -> (Cmd, i32);
     fn draw(&mut self, output_protocol:  &mut boot::ScopedProtocol<Output>, editor_info:& EditorInfo);
 }
 

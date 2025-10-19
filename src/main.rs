@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use uefi::proto::loaded_image::LoadedImage;
@@ -11,6 +12,7 @@ use uefi::boot::{self, get_handle_for_protocol};
 use uefi::runtime::{VariableVendor, VariableAttributes};
 
 use crate::uefi_editor::UefiEditor;
+use crate::input_ex::{InputEx};
 
 extern crate alloc;
 
@@ -21,6 +23,8 @@ mod area_manager;
 mod uefi_editor;
 mod constants;
 mod common;
+mod input_info;
+mod input_ex;
 
 fn make_test_variable() -> Status {
 
@@ -45,6 +49,7 @@ fn make_test_variable() -> Status {
 fn efi_main() -> Status {
     uefi::helpers::init().unwrap();
 
+
     //
     // prepare protocols
     //
@@ -60,11 +65,13 @@ fn efi_main() -> Status {
         Ok(p) => p,
         Err(err) => return err.status()
     };
-    let input_handle = match get_handle_for_protocol:: <Input>() {
+
+
+    let input_ex_handle = match get_handle_for_protocol:: <InputEx>() {
         Ok(h) => h,
-        Err(err) => return err.status(),
+        Err(err) => return err.status()
     };
-    let mut input_protocol: boot::ScopedProtocol<Input> = match boot::open_protocol_exclusive:: <Input>(input_handle) {
+    let mut input_ex_protocol: boot::ScopedProtocol<InputEx> = match boot::open_protocol_exclusive:: <InputEx>(input_ex_handle) {
         Ok(p) => p,
         Err(err) => return err.status()
     };
@@ -123,14 +130,17 @@ fn efi_main() -> Status {
         uefi_editor.draw();
         uefi_editor.update_cursor();
 
+
         unsafe {
-            ev = input_protocol.wait_for_key_event().unwrap().unsafe_clone();
+            ev = input_ex_protocol.wait_for_key_event().unwrap().unsafe_clone();
         }
         let _ = uefi::boot::wait_for_event(&mut [ev]);
 
-        if let Ok(Some(key)) = input_protocol.read_key() {
+        if let Some(key) = input_ex_protocol.read_key() {
             let _ = uefi_editor.input_handle(key);
+
         }
+
 
         if uefi_editor.is_quit {
             break;
